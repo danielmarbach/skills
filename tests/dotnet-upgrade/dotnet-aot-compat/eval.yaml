@@ -23,13 +23,13 @@ stimuli:
       - Used RequiresUnreferencedCode only as a last resort for fundamentally reflection-dependent code
       - "Did NOT use #pragma warning disable for any IL warning. Pragma only hides the warning from Roslyn — the
         linker still sees it, so it does not count as resolved."
-      - "If [UnconditionalSuppressMessage] was used at all, it was limited to a genuine last-resort case with a
-        Justification describing a real, verified invariant — not used as a shortcut in place of annotation or
-        refactoring work."
+      - "If [UnconditionalSuppressMessage] was used at all, it was limited to an invariant-proven leaf with a
+        Justification describing both the invariant and the mechanism independently preserving the reflected members."
       - Iteratively rebuilt to verify warnings were resolved, working from innermost call sites outward
       - Used source-generated System.Text.Json instead of reflection-based JSON serialization
-      - "Final build produces 0 IL warnings. Warnings suppressed via #pragma still count as unresolved; a justified
-        [UnconditionalSuppressMessage] at a proven invariant counts as resolved."
+      - "Final build produces 0 IL warnings. Warnings suppressed via #pragma still count as unresolved; an
+        [UnconditionalSuppressMessage] counts as resolved only when the reflected members are independently preserved
+        and the invariant is justified."
     constraints:
       expect_tools:
         - bash
@@ -100,35 +100,31 @@ stimuli:
       ```csharp
       static void InvokeHandler(string name, object[] args)
       {
-          Type handlerType = HandlerRegistry[name]; // IL2073: return type doesn't match required annotation
-          var method = handlerType.GetMethod("Handle"); // downstream call flagged too
+          Type handlerType = HandlerRegistry[name]; // IL2075: dictionary lookup loses the required annotation
+          var method = handlerType.GetMethod("Handle");
       }
       ```
 
-      A teammate suggested just adding `#pragma warning disable IL2073` above the method, since we've manually
+      A teammate suggested just adding `#pragma warning disable IL2075` above the method, since we've manually
       verified `HandlerRegistry` only ever contains public types that expose a `Handle` method. Is that the right
-      call, or is there a better way to record that guarantee?
+      call, or is there a better way to make this safe?
     graders:
       - type: output-matches
         config:
-          pattern: UnconditionalSuppressMessage
+          pattern: (DynamicallyAccessedMembers|DynamicDependency|registration)
       - type: output-matches
         config:
           pattern: (linker|ILLink|trimmer).{0,60}(still|does not|doesn't|won't) (see|know|honor)
       - type: exit-success
       - type: prompt
     rubric:
-      - "Rejected #pragma warning disable for the IL warning, explaining it only silences Roslyn at build time — the
-        linker and AOT compiler still see the underlying issue and can fail at publish time"
-      - Explained that [UnconditionalSuppressMessage] is the IL-persisted alternative the linker actually honors,
-        and is appropriate here only because the teammate's invariant is genuinely provable
-      - "Either required a Justification that states the actual invariant (HandlerRegistry only ever contains public
-        types with a Handle method), not a generic restatement of the warning, OR correctly pointed out that a
-        runtime dictionary's contents are not a statically provable invariant and recommended strengthening the
-        guarantee (e.g. rooting the known handler types with [DynamicDependency], or a compile-time registration)
-        before relying on suppression"
-      - Mentioned trying to preserve annotation flow (e.g. annotating HandlerRegistry's value type or return path)
-        as the first thing to attempt before reaching for suppression
+      - "Rejected #pragma warning disable for IL2075, explaining it only silences Roslyn at build time — the linker
+        and AOT compiler still see the underlying issue and can fail at publish time"
+      - Explained that the dictionary shape invariant does not preserve the reflected `Handle` methods
+      - Recommended preserving the methods through an annotated registration path, `DynamicDependency`, or direct
+        registration before treating the reflection path as safe
+      - Accepted either declining suppression or using `[UnconditionalSuppressMessage]` only as a narrowly scoped
+        record of a proven invariant after the reflected members are independently preserved
 
   - name: Choosing IsTrimmable vs IsAotCompatible for a multi-targeted library
     prompt: |

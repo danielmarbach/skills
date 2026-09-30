@@ -13,7 +13,7 @@ using System.Diagnostics.CodeAnalysis;
 | `[RequiresUnreferencedCode]` | The member needs members the linker cannot see (reflection by name, `Assembly.Load*`, `Type.GetType(string)`). |
 | `[RequiresDynamicCode]` | The member needs a JIT (emitting, dynamic dispatch, `Type.MakeGenericType` on unknown types). |
 | `[DynamicallyAccessedMembers]` | Declares which members of a `Type`/`string` must be preserved for reflection. |
-| `[UnconditionalSuppressMessage]` | IL-persisted suppression of a specific warning, with a mandatory justification. |
+| `[UnconditionalSuppressMessage]` | IL-persisted suppression of a specific warning; valid only with an independently preserved reflection target and a proven invariant. |
 | `[DynamicDependency]` | Keeps named members reachable; does **not** silence warnings on its own. |
 
 ---
@@ -108,7 +108,7 @@ Valid on `class`, `struct`, `interface`, `method`, `field`, `property`, `paramet
 | `Interfaces` (8192) | Interfaces implemented by the type. |
 | `All` (-1) | Everything. |
 
-Named composites also exist — `AllConstructors`, `AllMethods`, `AllFields`, `AllProperties`, `AllEvents`, `AllNestedTypes`, and the `*WithInherited` variants (`PublicConstructorsWithInherited`, `NonPublicMethodsWithInherited`, and so on). Name reusable sets in a constant:
+Named composites include `AllConstructors`, `AllMethods`, `AllFields`, `AllProperties`, `AllEvents`, and `AllNestedTypes`. The `*WithInherited` variants (such as `PublicConstructorsWithInherited`) are not available to `net8.0`; use them only when the target framework exposes them. Name reusable sets in a constant:
 
 ```csharp
 internal const DynamicallyAccessedMemberTypes CreatorMembersRequired =
@@ -153,7 +153,7 @@ Rule of thumb: annotate the narrowest part that actually needs it, so callers on
 
 ## `[UnconditionalSuppressMessage]`
 
-**Intent:** Suppress one specific warning at one location, persisted into IL so the linker respects it. This is the *only* suppression mechanism that works for trimming/AOT warnings — `#pragma warning disable` and `[SuppressMessage]` are stripped before linking and do nothing.
+**Intent:** Suppress one specific warning at one location, persisted into IL so the linker respects it. Unlike `#pragma warning disable` and `[SuppressMessage]`, it is preserved in IL; it is valid only when the warning is safe because the target is independently preserved and an invariant makes the suppression correct.
 
 **Signature:**
 
@@ -186,7 +186,7 @@ public string Serialize(object o)
 }
 ```
 
-- Prefer `[DynamicallyAccessedMembers]` or a source generator over suppression. Reserve suppression for the invariant-proven leaf after the rest of the design is trimming-safe.
+- Prefer `[DynamicallyAccessedMembers]`, `[DynamicDependency]`, or direct references to independently preserve the reflected members. If that cannot establish safety, use `[RequiresUnreferencedCode]` to propagate the incompatibility instead. Use suppression only at an invariant-proven leaf after preservation is established; suppression itself never preserves members.
 
 ---
 
@@ -246,6 +246,6 @@ AOT analysis runs *on top of* trim analysis (AOT implies trimming), so an AOT pu
 - `[RequiresUnreferencedCode]` → the member needs members the linker cannot see (trimming, `IL2026` at call sites).
 - `[RequiresDynamicCode]` → the member needs a JIT (AOT, `IL3050` at call sites).
 - `[DynamicallyAccessedMembers]` → preserve the narrowest member set; flow it backward through generic parameters, parameters, fields, and returns.
-- `[UnconditionalSuppressMessage]` → IL-persisted suppression with a mandatory, invariant-stating justification; the only working suppression for trim/AOT warnings.
+- `[UnconditionalSuppressMessage]` → IL-persisted suppression, valid only at an invariant-proven leaf after independently preserving the reflected members.
 - `[DynamicDependency]` → keep a named member reachable (does not silence warnings).
 - Never use `#pragma warning disable` or `[SuppressMessage]` for `IL2xxx`/`IL3xxx` — they are not persisted in IL.

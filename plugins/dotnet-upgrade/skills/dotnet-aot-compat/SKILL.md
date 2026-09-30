@@ -54,7 +54,7 @@ Reflection is not inherently wrong — it is fine and unrestricted in ordinary J
 ### ❌ Never hide warnings from the linker
 
 - **NEVER** use `#pragma warning disable` for IL warnings. It hides the warning from the Roslyn analyzer at build time only — the IL linker and AOT compiler still see the issue, and the code will fail at trim/publish time.
-- **`[UnconditionalSuppressMessage]` is a last resort, not a shortcut.** Unlike `#pragma`, it is IL-persisted, so the linker honors it too — but only reach for it at an invariant-proven leaf (you have manually verified the member is unreachable through trimming, e.g. a generic constraint guarantees the type), and only with a real `Justification` describing that invariant. Using it just to make a warning disappear without proving the invariant is exactly the shortcut this skill exists to prevent.
+- **`[UnconditionalSuppressMessage]` is a last resort, not a shortcut.** Unlike `#pragma`, it is IL-persisted, so the linker honors it. Use it only at an invariant-proven leaf after an annotated registration path, `DynamicDependency`, or direct reference independently preserves the reflected members. Its `Justification` must state both the invariant and preservation mechanism; it cannot make an unrooted reflection target safe.
 
 ### 💡 Preferred approaches
 
@@ -346,7 +346,7 @@ Do **not** add the external type to your `JsonSerializerContext` — it won't so
 - [ ] Built with trim/AOT analyzers enabled (net8.0+ TFM)
 - [ ] Fixed all IL warnings via annotations, refactoring, or replacing the reflection (source generator / `[UnsafeAccessor]` / trimming-safe island)
 - [ ] No `#pragma warning disable` used for any IL warning
-- [ ] Any `[UnconditionalSuppressMessage]` usage is a genuine last resort with a `Justification` describing a real, verified invariant
+- [ ] Any `[UnconditionalSuppressMessage]` usage is a genuine last resort at a leaf, with a `Justification` describing its verified invariant and independent preservation mechanism
 - [ ] Polyfills present for older TFMs if needed
 - [ ] All target frameworks build with 0 warnings
 - [ ] Verified with an actual `dotnet publish -p:PublishTrimmed=true`/`PublishAot=true` (or a rooting test app for a library), not just a warning-free build
