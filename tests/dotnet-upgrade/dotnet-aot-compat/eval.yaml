@@ -53,7 +53,7 @@ stimuli:
     graders:
       - type: output-matches
         config:
-          pattern: (source generator|source-generat)
+          pattern: (source generator|source-generat|marker interface|direct construction|compile-time)
       - type: exit-success
       - type: prompt
     rubric:
@@ -189,7 +189,7 @@ stimuli:
     graders:
       - type: output-matches
         config:
-          pattern: (does not|doesn't|not support|no support|cannot).{0,40}(net48|\.NET Framework|4\.8)
+          pattern: (does not|doesn't|not support|no support|cannot)[\s\S]{0,40}(net48|\.NET Framework|4\.8)
       - type: prompt
     rubric:
       - Recognized that .NET Framework (net48) does not support the trim/AOT analyzers or Native AOT

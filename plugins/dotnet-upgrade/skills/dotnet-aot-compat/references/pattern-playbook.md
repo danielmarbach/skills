@@ -226,7 +226,7 @@ public static class OrderAccessors
 
     // Property accessor: target the getter method by its compiler name.
     [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "get_Total")]
-    public static extern decimal GetTotal(Order order);
+    public static extern decimal GetTotalProperty(Order order);
 }
 ```
 
