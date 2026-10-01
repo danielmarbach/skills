@@ -1,25 +1,20 @@
 ---
 name: dotnet-aot-compat
 description: >
-  Make .NET projects and libraries compatible with Native AOT and trimming by
-  systematically resolving IL trim/AOT analyzer warnings, and by replacing
-  reflection-heavy code with source generators, [UnsafeAccessor], or trimming-safe
-  islands when the reflective surface itself should be removed rather than
-  annotated. USE FOR: making projects or libraries AOT-compatible, fixing trimming
-  warnings, resolving IL warnings (IL2026, IL2070, IL2067, IL2072, IL3050), adding
-  DynamicallyAccessedMembers annotations, enabling IsAotCompatible/IsTrimmable,
-  designing a trimming-safe public API, isolating a dynamic-only code path behind
-  RuntimeFeature.IsDynamicCodeSupported. DO NOT USE FOR: .NET Framework (net4x)
-  projects — they don't support the trim/AOT analyzers at all, so there are no IL
-  warnings to fix; publishing native AOT binaries; optimizing binary size unrelated
-  to trim/AOT warnings.
+  Make .NET projects compatible with Native AOT and trimming by systematically
+  resolving IL trim/AOT analyzer warnings. USE FOR: making projects AOT-compatible,
+  fixing trimming warnings, resolving IL warnings (IL2026, IL2070, IL2067, IL2072,
+  IL3050), adding DynamicallyAccessedMembers annotations, enabling IsAotCompatible
+  or IsTrimmable. DO NOT USE FOR: .NET Framework (net4x) projects, publishing native
+  AOT binaries, optimizing binary size, replacing reflection-heavy libraries with
+  alternatives.
   INVOKES: no tools — pure knowledge skill.
 license: MIT
 ---
 
 # dotnet-aot-compat
 
-Make .NET projects and libraries compatible with Native AOT and trimming by systematically resolving all IL trim/AOT analyzer warnings — either by making the reflection the analyzer can't see statically visible, or by removing the reflective surface entirely.
+Make .NET projects compatible with Native AOT and trimming by systematically resolving all IL trim/AOT analyzer warnings.
 
 ## When to Use This Skill
 
@@ -30,7 +25,6 @@ Make .NET projects and libraries compatible with Native AOT and trimming by syst
 - **"Enable IsAotCompatible in my .csproj"** or **"declare IsTrimmable for my library"**
 - **"My project has trim analyzer warnings after upgrading to net8.0"**
 - **"Annotate reflection code for the trimmer"**
-- **"Replace this reflection-based registration with a source generator"** or **"use UnsafeAccessor instead of reflection"**
 - **"Isolate this dynamic/plugin-loading code path so the rest of the library stays trimmable"**
 
 ## When Not to Use This Skill
@@ -47,20 +41,20 @@ Native AOT and the IL trimmer perform static analysis to determine what code is 
 
 Trimming (`PublishTrimmed`) and Native AOT (`PublishAot`) run the same static analysis — `IL2xxx` for trim warnings, `IL3xxx` for AOT/single-file warnings — but AOT additionally removes the JIT: `Reflection.Emit` is unsupported and constructing unknown generic instantiations at runtime is not guaranteed. A library can be trimmable but not AOT-compatible.
 
-Reflection is not inherently wrong — it is fine and unrestricted in ordinary JIT applications. The attributes in this skill exist to *allow* reflection to survive trimming/AOT, not to forbid it. Only annotate or replace reflection that a trimmed/AOT-published consumer will actually exercise.
+Reflection is not inherently wrong — it is fine and unrestricted in ordinary JIT applications. The attributes in this skill exist to *allow* reflection to survive trimming/AOT, not to forbid it. Reflection the analyzer can see statically needs no change: `typeof(KnownType).GetField("_name", ...)` with a constant name, or a `typeof(Concrete)` passed to an annotated `Type` parameter, produces no warning and the members are preserved.
 
 ## Critical Rules
 
-### ❌ Never hide warnings from the linker
+### ❌ Never suppress warnings incorrectly
 
-- **NEVER** use `#pragma warning disable` for IL warnings. It hides the warning from the Roslyn analyzer at build time only — the IL linker and AOT compiler still see the issue, and the code will fail at trim/publish time.
-- **`[UnconditionalSuppressMessage]` is a last resort, not a shortcut.** Unlike `#pragma`, it is IL-persisted, so the linker honors it. Use it only at an invariant-proven leaf after an annotated registration path, `DynamicDependency`, or direct reference independently preserves the reflected members. Its `Justification` must state both the invariant and preservation mechanism; it cannot make an unrooted reflection target safe.
+- **NEVER** use `#pragma warning disable` for IL warnings. It hides the warning from the Roslyn analyzer at build time only — the IL linker and AOT compiler still see the issue, so the warning comes back at publish and the code can break at runtime.
+- **NEVER** use `[UnconditionalSuppressMessage]` to make a warning go away. It tells both the analyzer AND the linker to ignore the warning, so the trimmer cannot verify safety. The only exception is a leaf where an annotated registration path, `DynamicDependency`, or direct reference already preserves the reflected members; the `Justification` must name that invariant and mechanism.
 
 ### 💡 Preferred approaches
 
 - **Prefer** `[DynamicallyAccessedMembers]` annotations to flow type information through the call chain.
 - **Prefer** refactoring to eliminate patterns that break annotation flow (e.g., boxing `Type` through `object[]`).
-- **Prefer replacing the reflection** with a source generator or `[UnsafeAccessor]` when you want the reflective surface gone entirely (e.g., a public registration API you don't want to ship with `[RequiresUnreferencedCode]`) — see [references/pattern-playbook.md](references/pattern-playbook.md).
+- **Prefer generic APIs** over `Type` parameters when the type is known at compile time — `typeof(T)` is statically visible, a runtime `Type` is not.
 - **Use** `[RequiresUnreferencedCode]` / `[RequiresDynamicCode]` / `[RequiresAssemblyFiles]` to mark methods as fundamentally incompatible with trimming, propagating the requirement to callers. This surfaces the issue clearly rather than hiding it — callers must explicitly acknowledge the incompatibility.
 
 ### Annotation flow is key
@@ -122,7 +116,7 @@ Group the warnings from Step 2 by warning code and count them. **Do not open ind
 | Many IL2026 + IL3050 from `JsonSerializer` | **Go to Strategy C immediately** — create a `JsonSerializerContext`, then batch-update all call sites |
 | IL2070/IL2087 on `Type` parameters | Add `[DynamicallyAccessedMembers]` to the innermost method, then cascade outward |
 | IL2067 passing unannotated `Type` | Annotate the parameter at the source |
-| Reflection you want gone entirely (public registration API, plugin loader, hot path) | **Go to Strategy D** — replace with a source generator, `[UnsafeAccessor]`, or a trimming-safe island |
+| Reflection you want gone entirely (object-typed public API, plugin loader, emit path) | **Go to Strategy D** — add a generic overload or isolate a trimming-safe island |
 
 **In most real projects, IL2026/IL3050 from JsonSerializer dominate.** Start with Strategy C unless the warning breakdown clearly shows otherwise. After the batch JSON fix, handle remaining warnings with Strategies A–B, reaching for D when you'd rather remove the reflection than annotate it. Only use Strategy E, and then F, as last resorts.
 
@@ -154,7 +148,7 @@ void Process([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMe
 }
 ```
 
-When you annotate a parameter, **all callers** must now pass properly annotated types. This cascades outward — follow each caller and annotate or refactor as needed. **The caller's annotation must include at least the same member types as the callee's.** If the callee requires `PublicConstructors | NonPublicConstructors`, the caller must specify the same or a superset — using only `NonPublicConstructors` will produce IL2091.
+When you annotate a parameter, **all callers** must now pass properly annotated types. A caller passing `typeof(Concrete)` already satisfies the annotation; the cascade only continues through callers that forward a `Type` variable — follow each of those and annotate or refactor as needed. **The caller's annotation must include at least the same member types as the callee's.** If the callee requires `PublicConstructors | NonPublicConstructors`, the caller must specify the same or a superset — using only `NonPublicConstructors` will produce IL2091.
 
 Choose the narrowest `DynamicallyAccessedMemberTypes` for the reflection actually performed:
 
@@ -229,13 +223,12 @@ internal partial class MyProjectJsonContext : JsonSerializerContext { }
 
 #### Strategy D: Replace the reflection instead of annotating it
 
-When the goal isn't just silencing the warning but removing the reflective surface — a public API you don't want to ship with `[RequiresUnreferencedCode]`, a hot path where reflection cost matters, or a registration mechanism you'd rather generate at compile time — replace it instead of wrapping it:
+When the goal isn't just silencing the warning but removing the reflective surface — a public API you don't want to ship with `[RequiresUnreferencedCode]` — replace it instead of wrapping it:
 
-- **Source generator**: emit direct type references at compile time (marker attribute → generated registration code) instead of scanning assemblies at runtime.
-- **`[UnsafeAccessor]`**: replaces `FieldInfo`/`MethodInfo`/`ConstructorInfo` reflection for accessing non-public members with a compiler-emitted direct call — no `DynamicallyAccessedMembers` needed.
+- **Generic overload**: `Process<T>(T value)` next to `Process(object value)` so `typeof(T)` flows statically instead of `value.GetType()`.
 - **Trimming-safe island**: when a path is inherently dynamic (emitting proxies, loading plugins by name), move it behind a boundary and provide a trimming-safe alternative selected by `RuntimeFeature.IsDynamicCodeSupported`.
 
-See [references/pattern-playbook.md](references/pattern-playbook.md) for full examples of each, plus generated-interception diagnostic suppressors, intentional runtime-scanning boundaries, and object-overload → generic-overload redirects.
+See [references/pattern-playbook.md](references/pattern-playbook.md) for full examples, plus intentional runtime-scanning boundaries.
 
 #### Strategy E: `[RequiresUnreferencedCode]` (last resort)
 
@@ -322,12 +315,12 @@ Do **not** add the external type to your `JsonSerializerContext` — it won't so
 
 3. **Shared projects / projitems**: When source is shared between multiple projects via `<Import>`, annotations added to shared code affect ALL consuming projects. Verify that all consumers still build cleanly.
 
-4. **More patterns**: generated-interception diagnostic suppressors, migration analyzers, strict-mode feature flags, and warning-approval baselines for locking down an existing warning surface are covered in [references/pattern-playbook.md](references/pattern-playbook.md).
+4. **More patterns**: DAM flow through extension methods and containers, strict-mode feature flags, and warning-approval baselines for locking down an existing warning surface are covered in [references/pattern-playbook.md](references/pattern-playbook.md).
 
 ## Reference Files
 
 - [references/trimming-attributes.md](references/trimming-attributes.md): the complete attribute catalog — `RequiresUnreferencedCode`, `RequiresDynamicCode`, `DynamicallyAccessedMembers` (full `DynamicallyAccessedMemberTypes` list), `UnconditionalSuppressMessage`, `DynamicDependency` — each with intent, exact signature, and rules, plus the `IL2xxx`/`IL3xxx` warning-code table.
-- [references/pattern-playbook.md](references/pattern-playbook.md): the full pattern playbook — source generators vs reflection, `[UnsafeAccessor]`, trimming-safe islands and capability guards, separating safe/unsafe code, `System.Text.Json` source generation, object-overload → generic-overload redirects with `[OverloadResolutionPriority]`, migration analyzers, warning-approval baselines, and known gotchas.
+- [references/pattern-playbook.md](references/pattern-playbook.md): patterns beyond the core workflow — intentional runtime scanning, DAM flow through extension methods and containers, trimming-safe islands and capability guards, object-overload → generic-overload redirects with `[OverloadResolutionPriority]`, strict-mode feature flags, warning-approval baselines, and known gotchas.
 - [references/polyfills.md](references/polyfills.md): polyfills for `DynamicallyAccessedMembersAttribute` and related types on netstandard2.0/net472 multi-targeted projects.
 
 ## References
@@ -344,7 +337,7 @@ Do **not** add the external type to your `JsonSerializerContext` — it won't so
 
 - [ ] Added `<IsAotCompatible>` (apps, and libraries by default) or, only when the library has a real permanent reason it can't be AOT-safe, `<IsTrimmable>`, with a TFM condition
 - [ ] Built with trim/AOT analyzers enabled (net8.0+ TFM)
-- [ ] Fixed all IL warnings via annotations, refactoring, or replacing the reflection (source generator / `[UnsafeAccessor]` / trimming-safe island)
+- [ ] Fixed all IL warnings via annotations, refactoring, or replacing the reflection (generic overload / trimming-safe island)
 - [ ] No `#pragma warning disable` used for any IL warning
 - [ ] Any `[UnconditionalSuppressMessage]` usage is a genuine last resort at a leaf, with a `Justification` describing its verified invariant and independent preservation mechanism
 - [ ] Polyfills present for older TFMs if needed

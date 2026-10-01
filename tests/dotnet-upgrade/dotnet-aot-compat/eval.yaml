@@ -53,17 +53,19 @@ stimuli:
     graders:
       - type: output-matches
         config:
-          pattern: (source generator|source-generat|marker interface|direct construction|compile-time)
+          pattern: (PublicParameterlessConstructor|new\(\)|Create<)
       - type: exit-success
       - type: prompt
     rubric:
-      - Recognized that annotation spreading across dozens of call sites is exactly the case where removing the
-        reflection is preferable to annotating around it
-      - Proposed a source generator (or an equivalent compile-time mechanism, such as a marker interface with direct
-        construction) that emits direct type references instead of activating via reflection
-      - Did not present spraying [DynamicallyAccessedMembers] across every call site as the only option
-      - Noted that this replacement only works because the plugin types are known at compile time — genuinely
-        runtime-unknown types would need a different approach
+      - "Explained that a `typeof(SomeConcretePlugin)` argument already satisfies a [DynamicallyAccessedMembers]
+        requirement statically, so annotating only the `pluginType` parameter does not require annotating those
+        call sites; only callers that forward a `Type` variable need the annotation"
+      - Chose the narrowest member type for Activator.CreateInstance(Type), PublicParameterlessConstructor, rather
+        than All or a broader set
+      - "Optionally offered a generic `Create<T>()` overload as an alternative, since `typeof(T)` is statically
+        visible"
+      - Did not propose a source generator, [RequiresUnreferencedCode], or [UnconditionalSuppressMessage] as the
+        primary fix when a single parameter annotation resolves the warning
 
   - name: Non-public field access on a type we don't own
     prompt: |
@@ -82,16 +84,17 @@ stimuli:
     graders:
       - type: output-matches
         config:
-          pattern: UnsafeAccessor
+          pattern: (statically|constant|already|no (trim |trimming |IL)?warning)
       - type: exit-success
       - type: prompt
     rubric:
-      - Recommended [UnsafeAccessor] as a reflection-free alternative for a known non-public member on a known,
-        fixed type
-      - Explained that UnsafeAccessor needs no DynamicallyAccessedMembers annotation because the target type and
-        member are fixed at compile time, unlike a Type discovered dynamically at runtime
-      - Did not suggest [RequiresUnreferencedCode] as the primary fix when a compile-time-known target is available
-      - Described or showed the extern static UnsafeAccessor method pattern rather than only naming the attribute
+      - "Recognized that `typeof(SomeSealedVendorType).GetField(\"_counter\", ...)` uses a known type and a constant
+        member name, which the trimmer analyzes statically and preserves, so it produces no trim/AOT warning"
+      - Did not present [RequiresUnreferencedCode], [DynamicallyAccessedMembers], [UnsafeAccessor], or other
+        rewrites as necessary for this code
+      - Suggested confirming with the trim/AOT analyzer or a trimmed/AOT publish rather than asserting safety
+        without verification
+      - Noted that the guarantee breaks if the type or field name becomes runtime-computed
 
   - name: Teammate proposes pragma to silence a stubborn IL warning
     prompt: |

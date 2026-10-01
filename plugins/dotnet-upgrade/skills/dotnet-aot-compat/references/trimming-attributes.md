@@ -29,7 +29,7 @@ using System.Diagnostics.CodeAnalysis;
 public void LoadPlugins(string path) { /* Assembly.Load ... */ }
 ```
 
-Valid on `class`, `constructor`, `method` (not on properties, fields, or events).
+Valid on `class`, `constructor`, `method`. Not on the property, field, or event symbol itself — put it on an accessor instead (see [Scoping attributes to property accessors](#scoping-attributes-to-property-accessors)).
 
 **Rules:**
 - Use when the requirement cannot be expressed more precisely: `Assembly.Load*`, `Type.GetType(string)` with a non-constant name, `XmlSerializer`, or reflection by a runtime-built name. Constant-name reflection (for example, `type.GetMethod("name")`) is usually a `[DynamicallyAccessedMembers]` case, not a `[RequiresUnreferencedCode]` case.
