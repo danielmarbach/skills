@@ -108,7 +108,7 @@ Valid on `class`, `struct`, `interface`, `method`, `field`, `property`, `paramet
 | `Interfaces` (8192) | Interfaces implemented by the type. |
 | `All` (-1) | Everything. |
 
-Named composites include `AllConstructors`, `AllMethods`, `AllFields`, `AllProperties`, `AllEvents`, and `AllNestedTypes`. The `*WithInherited` variants (such as `PublicConstructorsWithInherited`) are not available to `net8.0`; use them only when the target framework exposes them. Name reusable sets in a constant:
+`net10.0` adds `*WithInherited` values (such as `NonPublicMethodsWithInherited`) and the `AllConstructors`, `AllMethods`, `AllFields`, `AllProperties`, `AllEvents`, and `AllNestedTypes` composites built on them. They do not exist on `net8.0` or `net9.0`; there, combine the core flags explicitly (for example `PublicMethods | NonPublicMethods`, which does not cover inherited non-public members). Name reusable sets in a constant:
 
 ```csharp
 internal const DynamicallyAccessedMemberTypes CreatorMembersRequired =
@@ -186,7 +186,7 @@ public string Serialize(object o)
 }
 ```
 
-- Prefer `[DynamicallyAccessedMembers]`, `[DynamicDependency]`, or direct references to independently preserve the reflected members. If that cannot establish safety, use `[RequiresUnreferencedCode]` to propagate the incompatibility instead. Use suppression only at an invariant-proven leaf after preservation is established; suppression itself never preserves members.
+- Prefer `[DynamicallyAccessedMembers]`, `[DynamicDependency]`, or another explicit reflection-preserving root to independently preserve the reflected members. If that cannot establish safety, use `[RequiresUnreferencedCode]` to propagate the incompatibility instead. Use suppression only at an invariant-proven leaf after preservation is established; suppression itself never preserves members.
 
 ---
 

@@ -5,6 +5,10 @@ defaults:
   timeout: 1050s
 stimuli:
   - name: Make Azure.ResourceManager AOT-compatible
+    tags:
+      capability: library-aot-enablement
+      risk: unresolved-il-warnings
+      journey: make-library-aot-compatible
     prompt: Make the project in the before/ directory AOT-compatible. Do not consult the after/ directory.
     environment:
       files:
@@ -36,6 +40,10 @@ stimuli:
         - dotnet
 
   - name: Reflection-based type activation cascading across call sites
+    tags:
+      capability: annotation-flow-scoping
+      risk: annotation-churn
+      journey: fix-reflective-activation
     prompt: |
       This helper is called from dozens of places across our library, and after turning on trim analysis every one
       of those call sites now needs its own `[DynamicallyAccessedMembers]` annotation:
@@ -68,6 +76,10 @@ stimuli:
         primary fix when a single parameter annotation resolves the warning
 
   - name: Non-public field access on a type we don't own
+    tags:
+      capability: static-reflection-recognition
+      risk: unnecessary-rewrite
+      journey: review-private-field-access
     prompt: |
       We need to read a private field on a sealed type from a third-party package, to interoperate with a legacy
       component:
@@ -97,6 +109,10 @@ stimuli:
       - Noted that the guarantee breaks if the type or field name becomes runtime-computed
 
   - name: Teammate proposes pragma to silence a stubborn IL warning
+    tags:
+      capability: warning-suppression-policy
+      risk: hidden-linker-warnings
+      journey: evaluate-pragma-suppression
     prompt: |
       We have a trim warning we can't easily get rid of by refactoring:
 
@@ -117,7 +133,7 @@ stimuli:
           pattern: (DynamicallyAccessedMembers|DynamicDependency|registration)
       - type: output-matches
         config:
-          pattern: (linker|ILLink|trimmer).{0,60}(still|does not|doesn't|won't) (see|know|honor)
+          pattern: (linker|ILLink|trimmer)[\s\S]{0,60}(still|does not|doesn't|won't)\s+(see|know|honor)
       - type: exit-success
       - type: prompt
     rubric:
@@ -130,6 +146,10 @@ stimuli:
         record of a proven invariant after the reflected members are independently preserved
 
   - name: Choosing IsTrimmable vs IsAotCompatible for a multi-targeted library
+    tags:
+      capability: library-compat-property-choice
+      risk: overclaimed-aot-support
+      journey: configure-multitarget-library
     prompt: |
       We maintain a class library multi-targeting netstandard2.0 and net8.0. Most of it is already trim-safe, but it
       has one optional advanced-scenario fast path built on Reflection.Emit (with a slower reflection-based fallback
@@ -155,6 +175,10 @@ stimuli:
         NETSDK1210 warning
 
   - name: Already-compatible project needs no further changes
+    tags:
+      capability: no-op-recognition
+      risk: fabricated-work
+      journey: review-compatible-project
     prompt: |
       Here's our .csproj — can you check whether we still need to do any AOT/trimming work?
 
@@ -185,6 +209,10 @@ stimuli:
         optional, not required
 
   - name: Decline .NET Framework trim request
+    tags:
+      capability: unsupported-target-detection
+      risk: misapplied-aot-guidance
+      journey: assess-net-framework-aot
     prompt: |
       Our WinForms app targets net48 and startup feels sluggish. We're weighing whether Native AOT would help shrink
       our deployment size. What would that actually take for us?

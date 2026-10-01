@@ -48,7 +48,7 @@ Reflection is not inherently wrong — it is fine and unrestricted in ordinary J
 ### ❌ Never suppress warnings incorrectly
 
 - **NEVER** use `#pragma warning disable` for IL warnings. It hides the warning from the Roslyn analyzer at build time only — the IL linker and AOT compiler still see the issue, so the warning comes back at publish and the code can break at runtime.
-- **NEVER** use `[UnconditionalSuppressMessage]` to make a warning go away. It tells both the analyzer AND the linker to ignore the warning, so the trimmer cannot verify safety. The only exception is a leaf where an annotated registration path, `DynamicDependency`, or direct reference already preserves the reflected members; the `Justification` must name that invariant and mechanism.
+- **NEVER** use `[UnconditionalSuppressMessage]` to make a warning go away. It tells both the analyzer AND the linker to ignore the warning, so the trimmer cannot verify safety. The only exception is a leaf where an annotated registration path, `DynamicDependency`, or another explicit reflection-preserving root already preserves the reflected members; the `Justification` must name that invariant and mechanism.
 
 ### 💡 Preferred approaches
 

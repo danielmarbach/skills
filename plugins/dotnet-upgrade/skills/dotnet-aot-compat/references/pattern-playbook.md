@@ -82,7 +82,7 @@ public static int GetMethodCount(TypeKey key)
 
 The annotation on the property flows to both the backing field and the getter's return value, so reading `key.Type` yields an annotated `Type`. Use a `record` (struct or class) for value/structural equality so it works as a dictionary key, and put the annotation on an **explicit property** — a positional record parameter's attribute does not flow to the getter return.
 
-**Collections and enumerables drop the flow.** `[DynamicallyAccessedMembers]` is only valid on a bare `Type` or `string` — annotating a `Type[]`, `List<Type>`, `IEnumerable<Type>`, or any collection-typed member is invalid (`IL2097`/`IL2098`). Of the containers, only **arrays** preserve element flow: an annotated `Type` stored into a `Type[]` keeps its annotation, so `arr[0]` reads an annotated `Type`. Generic collections and LINQ do not — `list[0]`, a dictionary key, and `enumerable.First()` all return an unannotated `Type` (`IL2075`), and a LINQ lambda's element parameter is unannotated too (`IL2070`):
+**Collections and enumerables drop the flow.** `[DynamicallyAccessedMembers]` is only valid on a bare `Type` or `string` — annotating a `Type[]`, `List<Type>`, `IEnumerable<Type>`, or any collection-typed member is invalid (`IL2097`/`IL2098`). Arrays are the one narrow exception: when an array is created in the same method and read back at a constant index, the analyzer tracks the stored annotated `Type`. A `Type[]` parameter, an array returned from another method, or a variable index loses the flow (`IL2065`). Generic collections and LINQ never preserve it — `list[0]`, a dictionary key, and `enumerable.First()` all return an unannotated `Type` (`IL2075`), and a LINQ lambda's element parameter is unannotated too (`IL2070`):
 
 ```csharp
 public static int ViaList([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods)] Type t)
@@ -94,7 +94,7 @@ public static int ViaList([DynamicallyAccessedMembers(DynamicallyAccessedMemberT
 public static int ViaArray([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods)] Type t)
 {
     var arr = new[] { t };
-    return arr[0].GetMethods().Length; // OK: arrays preserve element flow
+    return arr[0].GetMethods().Length; // OK: local array, constant index
 }
 ```
 
