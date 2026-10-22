@@ -46,8 +46,9 @@ stimuli:
       risk: annotation-churn
       journey: fix-reflective-activation
     prompt: |
-      This helper is called from dozens of places across our library, and after turning on trim analysis every one
-      of those call sites now needs its own `[DynamicallyAccessedMembers]` annotation:
+      This helper is called from dozens of places across our library. After turning on trim analysis the build
+      warns on the `Activator.CreateInstance` call, and from what we've read the fix is to decorate the `Type`
+      parameter and then chase the same fix into every caller that hands it a type:
 
       ```csharp
       public static class PluginFactory
@@ -56,9 +57,9 @@ stimuli:
       }
       ```
 
-      Every caller passes a `typeof(SomeConcretePlugin)` that's known at compile time. Annotating every one of those
+      Every caller passes a `typeof(SomeConcretePlugin)` that's known at compile time. Touching every one of those
       call sites is a lot of churn and leaks trimming details into public APIs we don't control. Is there a better
-      way to make this trim/AOT-safe without spreading `[DynamicallyAccessedMembers]` everywhere?
+      way to make this trim/AOT-safe?
     graders:
       - type: output-matches
         config:

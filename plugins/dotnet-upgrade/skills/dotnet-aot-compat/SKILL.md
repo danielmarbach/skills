@@ -85,7 +85,7 @@ For an **application**, add `IsAotCompatible`. If the project doesn't exclusivel
 </PropertyGroup>
 ```
 
-Either property automatically enables the trim analyzer for compatible TFMs. For multi-targeting projects (e.g., `netstandard2.0;net8.0`), the condition ensures no `NETSDK1210` warnings on older TFMs.
+Either property automatically enables the trim analyzer for compatible TFMs. For multi-targeting projects (e.g., `netstandard2.0;net8.0`), the condition prevents the unsupported-TFM warnings on older targets: `NETSDK1210` for `IsAotCompatible`, `NETSDK1212` for `IsTrimmable`.
 
 ### Step 2: Build and collect warnings
 
@@ -266,7 +266,7 @@ After each small batch of fixes (5-10 warnings), rebuild with `--no-incremental`
 
 Build all target frameworks to ensure:
 - **0 IL warnings** on net8.0+ TFMs
-- **No NETSDK1210 warnings** (the `IsAotCompatible`/`IsTrimmable` condition handles this)
+- **No NETSDK1210 (`IsAotCompatible`) or NETSDK1212 (`IsTrimmable`) warnings** (the TFM condition handles this)
 - **Clean builds** on older TFMs (netstandard2.0, net472, etc.)
 
 ```bash
