@@ -153,11 +153,12 @@ stimuli:
       risk: overclaimed-aot-support
       journey: configure-multitarget-library
     prompt: |
-      We maintain a class library multi-targeting netstandard2.0 and net8.0. Most of it is already trim-safe, but it
-      has one optional advanced-scenario fast path built on Reflection.Emit (with a slower reflection-based fallback
-      for when that's unavailable), so we can't honestly promise full Native AOT support. We still want consumers to
-      see trim warnings if they misuse the rest of the API. Which MSBuild property should we set, and how do we
-      avoid breaking the netstandard2.0 target?
+      We maintain a class library multi-targeting netstandard2.0 and net8.0. Most of it is already trim-safe, but
+      one advanced feature generates and compiles expression trees at runtime through Reflection.Emit. There is no
+      non-emit implementation of that feature and we are not going to write one, so the feature simply does not
+      exist on Native AOT and we can't honestly promise full AOT support. We still want consumers to see trim
+      warnings if they misuse the rest of the API. Which MSBuild property should we set, and how do we avoid
+      breaking the netstandard2.0 target?
     graders:
       - type: output-matches
         config:

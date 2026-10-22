@@ -72,7 +72,7 @@ Valid on `method`, `constructor`, and (since .NET 7) `class`.
 public string[] FindManifests() => Directory.GetFiles(Path.GetDirectoryName(typeof(Plugin).Assembly.Location)!);
 ```
 
-Valid on `method`, `constructor`, `property`, `event`, and `class`.
+Valid on `method`, `constructor`, `property`, and `event`. Unlike `[RequiresUnreferencedCode]`, it cannot be applied to a class.
 
 **Rules:**
 - Direct uses of `Assembly.Location` (`IL3000`) and `Assembly.GetFile`/`GetFiles` (`IL3001`) warn on their own; use `AppContext.BaseDirectory` or an embedded resource instead, or annotate the member when the file dependency is intrinsic.
